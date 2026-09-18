@@ -1,0 +1,48 @@
+config:
+  target: "https://api.weatherstack.com"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      rampTo: 20
+      name: "Kademeli artan yük testi"
+  
+  # .env dosyasından API anahtarını doğrudan çekiyoruz
+  environments:
+    test:
+      variables:
+        apiKey: "{{ $env.WEATHERSTACK_API_KEY }}"
+
+  payload:
+    path: "../data/post-payload.csv"
+    fields:
+      - "query"
+    order: "sequence"
+    cast: true
+
+  ensure:
+    thresholds:
+      - "http.response_time.p95 < 1500"
+      - "http.response_time.median < 800"
+      - "http.codes.200 == 100"
+
+scenarios:
+  - name: "Weatherstack GET ve POST Performans Senaryosu"
+    weight: 100
+    flow:
+      - get:
+          url: "/current?access_key={{ apiKey }}&query={{ query }}"
+          expect:
+            - statusCode: 200
+            - hasProperty: "current"
+
+      - think: 2
+
+      - post:
+          url: "/current"
+          headers:
+            Content-Type: "application/json"
+          json:
+            access_key: "{{ apiKey }}"
+            target_city: "{{ query }}"
+          expect:
+            - statusCode: [200, 400, 405]
